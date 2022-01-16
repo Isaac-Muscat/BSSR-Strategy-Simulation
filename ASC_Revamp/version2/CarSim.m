@@ -17,6 +17,9 @@ classdef CarSim < handle
         windSpeed_kmph  = 0;
         windDir_deg     = 0;
         carDir_deg      = 0;
+        
+        currentDniCol = 3; % DNI CSV starts at 3rd column
+        currentDniRow = 2; % DNI CSV starts at 2nd row
     end
     properties
         speed_kmph;
@@ -36,6 +39,14 @@ classdef CarSim < handle
             
             % Initial entry
             this.info.BatteryCharge_kwh(end, 1) = 5;
+        end
+        
+        function speed = getSpeed(this)
+            speed = this.speed_kmph;
+        end
+        
+        function plan = getLoopPlan(this)
+            plan = this.loopPlan;
         end
         
         function wait(this, pos, dTime_h, time)
@@ -226,24 +237,56 @@ classdef CarSim < handle
         
         function [dni, dhi] = getIrradiance(this, time, pos)
             time_datenum = datenum(time);
-            dni = this.DNI;
-            locTime = [];
-            for j = 3:size(dni,2)
-                locTime(j-2) = abs(etime(datevec(time_datenum),datevec(dni(1,j))));
+            dni_csv = this.DNI;
+            
+            curCol = this.currentDniCol;
+            min_error_col = curCol;
+            for i = curCol:this.currentDniCol:size(dni_csv,2)
+                curError = abs(etime(datevec(time_datenum),datevec(dni_csv(1,min_error_col))));
+                newError = abs(etime(datevec(time_datenum),datevec(dni_csv(1,i))));
+                if newError > curError
+                    break;
+                end
+                min_error_col = i;
+            end
+            col = min_error_col;
+            this.currentDniCol = col;
+            
+            curRow = this.currentDniRow;
+            min_error_row = curRow;
+            for i = curRow:(size(dni_csv,1)/2)
+                left_index = curRow - i;
+                right_index = curRow + i;
+                
+                leftSide = 99999;
+                rightSide = 99999;
+                
+                % Check current
+                current = getDist(pos(1),pos(2),dni_csv(min_error_row,1),dni_csv(min_error_row,2));
+                
+                % Check leftSide
+                if left_index > 1
+                    leftSide = getDist(pos(1),pos(2),dni_csv(left_index,1),dni_csv(left_index,2));
+                end
+                
+                % Check rightside
+                if right_index < size(dni_csv,1)
+                    getDist(pos(1),pos(2),dni_csv(right_index,1),dni_csv(right_index,2));
+                end
+                
+                if leftSide > current && rightSide > current
+                    break;
+                elseif leftSide < rightSide
+                    min_error_row = left_index;
+                else
+                    min_error_row = right_index;
+                end
             end
 
-            [minTime,col] = min(locTime);
-            col = col + 2;
+            row = min_error_row;
+            this.currentDniRow = row;
             
-            locDist= [];
-            for j = 2:size(dni,1)
-                locDist(j-1) = getDist(pos(1),pos(2),dni(j,1),dni(j,2));
-            end
-
-            [minDist,row] = min(locDist);
-            row = row + 1;
-            
-            dni = dni(row, col);
+            dni = dni_csv(row, col);
             dhi = this.DHI(row, col);
         end
         

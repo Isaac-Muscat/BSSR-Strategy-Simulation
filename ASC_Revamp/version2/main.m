@@ -89,10 +89,10 @@ route = Route(ROUTE_CSV, Checkpoints, Loops, Stages, carSimGen);
 
 % TODO Calculate stage/loop distances
 % TODO Discard untimely plans
-% TODO Sort plans by distance and maybe speeds
+route.cullLateSims();
 
 % Search through plans and run sim on each one
-route.runSims();
+% route.runSims();
 
 % Tabulate the results of sims in csvs
 

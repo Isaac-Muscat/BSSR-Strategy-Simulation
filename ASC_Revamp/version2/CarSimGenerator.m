@@ -22,7 +22,7 @@ classdef CarSimGenerator
         end
         
         function sims = generateSims(this)
-            sims = [CarSim(0, [1, 1, 1])];
+            sims = [CarSim(0, [])];
             sims(end, :) = [];
             speeds = this.LOOP_PLAN_GEN.getSpeeds();
             plans = this.LOOP_PLAN_GEN.getPlans();
