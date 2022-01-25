@@ -1,4 +1,6 @@
 classdef CarSim < handle
+    % Represents the base class holding all the information for the
+    % simulation. The 
     properties(Constant)
         consts = simConstants;
         CAR_MASS_KG         = 300;
@@ -18,8 +20,8 @@ classdef CarSim < handle
         windDir_deg     = 0;
         carDir_deg      = 0;
         
+        % Current column index in the DNI and DHI csvs
         currentDniCol = 3; % DNI CSV starts at 3rd column
-        currentDniRow = 2; % DNI CSV starts at 2nd row
     end
     properties
         speed_kmph;
@@ -28,13 +30,16 @@ classdef CarSim < handle
         DNI;
         DHI;
         DNI_SCALING;
+        DNI_ROW_LOOKUP;
     end
     
     methods(Access = public)
         function this = CarSim(car_speed_kmh, loop_plan)
-            % Constructs an instance of this class.
+            % INPUTS: constant speed of the car and repeats for each loop
             this.speed_kmph = car_speed_kmh;
             this.loopPlan   = loop_plan;
+            
+            % this.info stores simulation data
             this.info = this.createTable();
             
             % Initial entry
@@ -50,6 +55,9 @@ classdef CarSim < handle
         end
         
         function wait(this, pos, dTime_h, time)
+            % INPUTS: car position, the amount of time to wait, and the
+            % current time.
+            % Update simulation state with the car at rest
             
             % Car charging on stand (Perfect 90 deg array to sun)
             Az = 0;
@@ -85,16 +93,17 @@ classdef CarSim < handle
             if data.BatteryCharge_kwh > 5
                 data.BatteryCharge_kwh = 5;
             elseif data.BatteryCharge_kwh < 0
-                success = 0;
                 return;
             end
-            success = 1;
             
             this.updateInfo(data);
             
         end
         
         function [success, dTime_h] = update(this, pos1, pos2, time)
+            % INPUTS: initial position, final position, and current time
+            % OUTPUTS: success flag for wheather the car ran out of charge
+            % or not and a change in time.
             
             % Get orientation
             dDist_km        = getDist(pos1(1), pos1(2), pos2(1), pos2(2));
@@ -187,6 +196,11 @@ classdef CarSim < handle
         end
         
         function gain = getArrayGains(this, Az, El, dTime_h, time, pos)
+            % Calculates gains from the array.
+            % INPUTS: Azimuth angle, Elevation angle, change in time,
+            % current time, and the current position.
+            % OUTPUT: energy change in kwh.
+            
             delta_time_s = dTime_h * 3600;
             [dni, dhi]   = this.getIrradiance(time, pos);
             dni_scaling  = this.getDniScaling(Az, El);
@@ -196,7 +210,10 @@ classdef CarSim < handle
         end
         
         function loss = getLoss(this, dTime_h, dDist_km, dAltitude_km)
-            % Get the loss of the car at an instance.
+            % Calculates the loss of the car at an instance.
+            % INPUTS: Change in time, change in distance, change in
+            % altitude.
+            
             if dDist_km == 0
                 speed_mps = 0;
             else
@@ -210,7 +227,8 @@ classdef CarSim < handle
             gravity_loss_kwh = (this.CAR_MASS_KG*9.81*dAltitude_km*1000)/(3.6e6);% J to kwh
             
             general_loss_kwh = aero_loss_kwh + rolling_loss_kwh + electrical_loss_kwh;
-
+            
+            % Handle all cases of energy loss
             if gravity_loss_kwh >= 0 % Uphill 
                 loss = general_loss_kwh + gravity_loss_kwh;
 
@@ -236,6 +254,9 @@ classdef CarSim < handle
         end
         
         function [dni, dhi] = getIrradiance(this, time, pos)
+            % Finds the dni and dhi values for current time and position of
+            % the car.
+            
             time_datenum = datenum(time);
             dni_csv = this.DNI;
             
@@ -252,42 +273,12 @@ classdef CarSim < handle
             col = min_error_col;
             this.currentDniCol = col;
             
-            curRow = this.currentDniRow;
-            min_error_row = curRow;
-            for i = curRow:(size(dni_csv,1)/2)
-                left_index = curRow - i;
-                right_index = curRow + i;
-                
-                leftSide = 99999;
-                rightSide = 99999;
-                
-                % Check current
-                current = getDist(pos(1),pos(2),dni_csv(min_error_row,1),dni_csv(min_error_row,2));
-                
-                % Check leftSide
-                if left_index > 1
-                    leftSide = getDist(pos(1),pos(2),dni_csv(left_index,1),dni_csv(left_index,2));
-                end
-                
-                % Check rightside
-                if right_index < size(dni_csv,1)
-                    getDist(pos(1),pos(2),dni_csv(right_index,1),dni_csv(right_index,2));
-                end
-                
-                if leftSide > current && rightSide > current
-                    break;
-                elseif leftSide < rightSide
-                    min_error_row = left_index;
-                else
-                    min_error_row = right_index;
-                end
-            end
-
-            row = min_error_row;
-            this.currentDniRow = row;
+            distance = getDist(dni_csv(2, 1), dni_csv(2, 2), pos(1), pos(2));
+            [val, idx] = min(abs(this.DNI_ROW_LOOKUP(:, 1) - distance));
+            row = this.DNI_ROW_LOOKUP(idx, 2);
             
-            dni = dni_csv(row, col);
-            dhi = this.DHI(row, col);
+            dni = dni_csv(idx, col);
+            dhi = this.DHI(idx, col);
         end
         
         function dni_scaling = getDniScaling(this, Az, El)
