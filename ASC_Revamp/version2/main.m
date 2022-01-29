@@ -79,7 +79,7 @@ Indices     = STAGE_STOP_INDICES';
 Stages = table(OpenTimes, CloseTimes, Indices);
 
 % Create a loop plan generator
-loopPlanGen = LoopPlanGenerator(60:80, 3, 3);
+loopPlanGen = LoopPlanGenerator(60:60, 3, 1);
 
 % Create a simulation generator
 carSimGen = CarSimGenerator(DNI_SCALING_CSV, DNI_CSV, DHI_CSV, loopPlanGen);

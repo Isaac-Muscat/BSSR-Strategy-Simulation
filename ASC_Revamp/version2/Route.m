@@ -50,7 +50,7 @@ classdef Route < handle
         end
     end
     
-    methods(Access = private)
+    methods(Access = public)
         function calculateDistances(this)
             this.STOP_INDEXES = sort([this.STAGES.Indices; this.CHECKPOINTS.Indices]);
             this.STOP_DISTANCES = [];
@@ -216,8 +216,8 @@ classdef Route < handle
                             loop_path = this.LOOPS.Path{num_loops};
                             for k=2:size(loop_path, 1)
                                 % Get positions
-                                pos1 = this.loop_path(k-1, :);
-                                pos2 = this.loop_path(k, :);
+                                pos1 = loop_path(k-1, :);
+                                pos2 = loop_path(k, :);
 
                                 % Update the state of the car
                                 [success, dTime_h] = sim.update(pos1, pos2, time);
